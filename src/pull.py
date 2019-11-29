@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 data_dir = "../data"
-data_type = "train2017"
+data_type = "val2017"
 annotation_file = '{}/annotations/instances_{}.json'.format(data_dir, data_type)
 coco = COCO(annotation_file)
 
@@ -36,9 +36,9 @@ def plot_image(image_json):
     cv2.imshow('image', image)
     cv2.waitKey()
 
-def area_analysis(image_ids):
+def area_filter(image_ids, threshold=0.1):
     """ 
-    This is to understand the distribution of number of objects in each images
+    This is to filter out object that is too small.
     Return the dataframe containing the image_id and annotation_id
     """
     results = []
@@ -53,7 +53,7 @@ def area_analysis(image_ids):
     df['ratio'] = df['segment_area']/df['width']/df['height']
 
     # only select the object whose segment area is > 10% of image area.
-    df = df[df['ratio'] > 0.1]
+    df = df[df['ratio'] > threshold]
 
     plt.hist(df['ratio'], bins=100, rwidth=0.8)
     plt.show()
@@ -63,7 +63,10 @@ def area_analysis(image_ids):
 
 if __name__ == "__main__":
     #plot_image(images[np.random.randint(len(images))])
-    area_analysis(image_ids)
+    df = area_filter(image_ids)
+    images = coco.loadImgs(df['image_id'].unique())
+    for i in range(20):
+        plot_image(images[i])
 
 
 
