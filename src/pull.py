@@ -4,9 +4,10 @@ import numpy as np
 import cv2
 import os
 import matplotlib.pyplot as plt
+import pandas as pd
 
 data_dir = "../data"
-data_type = "val2017"
+data_type = "train2017"
 annotation_file = '{}/annotations/instances_{}.json'.format(data_dir, data_type)
 coco = COCO(annotation_file)
 
@@ -38,23 +39,32 @@ def plot_image(image_json):
 def area_analysis(image_ids):
     """ 
     This is to understand the distribution of number of objects in each images
+    Return the dataframe containing the image_id and annotation_id
     """
-
+    results = []
     images = coco.loadImgs(image_ids)
     for image in images:
-        annotation_ids = coco.getAnnIds(imgIds=image_json['id'], catIds=people_id, iscrowd=False)
+        annotation_ids = coco.getAnnIds(imgIds=image['id'], catIds=people_id, iscrowd=False)
         annotations = coco.loadAnns(annotation_ids)
+        for annotation in annotations:
+            results.append([image['id'], annotation['id'], image['width'], image['height'], annotation['area']])
+    
+    df = pd.DataFrame(results, columns = ['image_id', 'annotation_id', 'width', 'height', 'segment_area'])
+    df['ratio'] = df['segment_area']/df['width']/df['height']
 
+    # only select the object whose segment area is > 10% of image area.
+    df = df[df['ratio'] > 0.1]
 
+    plt.hist(df['ratio'], bins=100, rwidth=0.8)
+    plt.show()
+    print(df['ratio'].describe())
+
+    return df
 
 if __name__ == "__main__":
     #plot_image(images[np.random.randint(len(images))])
+    area_analysis(image_ids)
 
-raise SystemExit
-for item in annotation:
-    print("ratio: {}".format(item['area']/img['height']/img['width']))
 
-#coco.showAnns(annotation)
-#plt.show()
 
 
