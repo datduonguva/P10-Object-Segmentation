@@ -1,4 +1,5 @@
 from pycocotools.coco import COCO
+from pycocotools import mask
 from pprint import pprint
 import numpy as np
 import cv2
@@ -56,18 +57,33 @@ def area_filter(image_ids, threshold=0.1):
     df = df[df['ratio'] > threshold]
 
     plt.hist(df['ratio'], bins=100, rwidth=0.8)
-    plt.show()
+#    plt.show()
     print(df['ratio'].describe())
 
     return df
 
+def process_mask(coco_object, annotation_ids):
+    annotations = coco.loadAnns(annotation_ids)
+    polygons = []
+    for annotation in annotations:
+        polygons += annotation['segmentation']
+    encoded_mask = mask.frPyObjects(polygons, df.iloc[idx]['height'], df.iloc[idx]['width'])
+
+    # get the encoded mask
+    binary_mask = mask.decode(encoded_mask)
+
+    # decode to binary
+    binary_mask = np.sum(binary_mask, axis=-1) > 0
+    binary_mask = binary_mask.astype(np.float)
+    binary_mask = np.expand_dims(binary_mask, axis=-1)
+    
+    # return in  H*W*1 dimension
+    return binary_mask
+
 if __name__ == "__main__":
     #plot_image(images[np.random.randint(len(images))])
     df = area_filter(image_ids)
-    images = coco.loadImgs(df['image_id'].unique())
-    for i in range(20):
-        plot_image(images[i])
-
-
-
-
+    idx = np.random.randint(len(df))
+    i = df['image_id'].iloc[idx]
+    annotation_ids = df[df['image_id'] == i]['annotation_id'].tolist()
+    
