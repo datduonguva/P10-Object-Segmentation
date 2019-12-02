@@ -1,2 +1,3 @@
 # P10-Object-Segmentation
-For experimenting object segmentation
+Early results without any fine-tuning
+![Image segmentation](image_segmentation.png)
