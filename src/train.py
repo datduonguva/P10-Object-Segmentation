@@ -4,6 +4,7 @@ from pprint import pprint
 import numpy as np
 import cv2
 import os
+import shutil
 import matplotlib.pyplot as plt
 import pandas as pd
 from keras.models import Model
@@ -13,9 +14,9 @@ from keras.applications import MobileNetV2
 from keras.callbacks import TensorBoard, ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
 from keras.losses import binary_crossentropy
 from keras.utils import plot_model 
-data_dir = "../data"
-val_type = "val2017"
-train_type = 'val2017'
+data_dir = '../data'
+val_type = 'val2017'
+train_type = 'train2017'
 
 train_annotation_file = '{}/annotations/instances_{}.json'.format(data_dir, train_type)
 val_annotation_file = '{}/annotations/instances_{}.json'.format(data_dir, val_type)
@@ -27,22 +28,24 @@ val_coco = COCO(val_annotation_file)
 train_people_id = train_coco.getCatIds(catNms=['person'])
 val_people_id = val_coco.getCatIds(catNms=['person'])
 
-train_image_ids = train_coco.getImgIds(catIds=train_people_id)[:500]
-val_image_ids = val_coco.getImgIds(catIds=val_people_id)[600:700]
+train_image_ids = train_coco.getImgIds(catIds=train_people_id)
+val_image_ids = val_coco.getImgIds(catIds=val_people_id)
 
+log_dir = '/content/drive/My Drive/projects/P10-Object-Segmentation/logs/001/'
 
-def train_model():
-
-    log_dir = 'logs/001/'
+def train_model(log_dir):
+    """
+    This is the main function to train the model
+    """
     logging = TensorBoard(log_dir=log_dir)
 
     df_train = area_filter(train_image_ids, train_coco)
     df_val = area_filter(val_image_ids, val_coco)
 
-    train_generator = image_generator(df_train, train_coco, train_type)
-    val_generator = image_generator(df_val, val_coco, val_type)
+    batch_size = 64
 
-
+    train_generator = image_generator(df_train, train_coco, train_type, batch_size)
+    val_generator = image_generator(df_val, val_coco, val_type, batch_size)
 
     checkpoint = ModelCheckpoint(log_dir + 'best_model.h5',
         monitor='val_loss', save_weights_only=True, save_best_only=True, period=1)
@@ -52,14 +55,75 @@ def train_model():
     plot_model(model, to_file='model.png', show_shapes=True)
     model.compile(optimizer='adam', loss=custom_loss, metrics=['accuracy'])
     model.fit_generator(generator=train_generator,
-                        steps_per_epoch=np.ceil(len(train_image_ids)/16),
-                        epochs=2,
+                        steps_per_epoch=np.ceil(len(train_image_ids)/batch_size),
+                        epochs=20,
                         callbacks=[checkpoint, logging],
                         validation_data=val_generator,
-                        validation_steps=np.ceil(len(val_image_ids)/16))
+                        validation_steps=np.ceil(len(val_image_ids)/batch_size))
 
 def custom_loss(y_true, y_pred):
     return binary_crossentropy(y_true, y_pred)
+
+def show_performance(model):
+    """ This function is to show some examples from validation data """
+    val_image_ids_ = [i for i in val_image_ids]
+    np.random.shuffle(val_image_ids_)
+
+    df_val = area_filter(val_image_ids_, val_coco)
+    image_id = df_val['image_id'].iloc[0]
+    annotation_ids = df_val[df_val['image_id'] == image_id]['annotation_id'].tolist()
+
+    image_json = val_coco.loadImgs([image_id])[0]
+    raw_image = cv2.imread(os.path.join("{}/{}/{}".format(data_dir, val_type, image_json['file_name'])))
+    height, width, _ = raw_image.shape
+
+    # decode the mask, using annotation id created at the group by above
+    binary_mask = process_mask(val_coco, annotation_ids, width, height)
+
+    # preprocess input and mask (resize to 128, scale to [0, 1))
+    input_image, input_mask = preprocess(raw_image, binary_mask)
+
+    input_mask = np.expand_dims(input_mask, axis=-1)
+    predicted_mask = model.predict(np.array([input_image]))[0]
+
+    plt.figure(figsize=(20, 20))
+
+    title = ['Input Image', 'True Mask', 'Predicted Mask']
+    display_list = [input_image[:, :, ::-1], input_mask, predicted_mask]
+    for i in range(len(display_list)):
+        plt.subplot(1, len(display_list), i+1)
+        plt.title(title[i])
+        plt.imshow(array_to_img(display_list[i]))
+        plt.axis('off')
+    plt.show()
+
+def load_trained_model(log_dir):
+    """ this function loads a train model at log_dir, whose name is "best_model.h5" """
+    model = create_model()
+
+    model.load_weights(os.path.join(log_dir, "best_model.h5"))
+    return model
+    
+
+def copy_training_data():
+    """ helper method to pack only training data from COCO dataset"""
+    df_train = area_filter(train_image_ids, train_coco)
+    df_val = area_filter(val_image_ids, val_coco)
+
+    train_images = train_coco.loadImgs(df_train['image_id'].unique().tolist())
+    val_images = val_coco.loadImgs(df_val['image_id'].unique().tolist())
+    
+    for i, image in enumerate(train_images):
+        shutil.copyfile("{}/{}/{}".format(data_dir, train_type, image['file_name']),
+                        "{}/{}/{}".format(data_dir, "train_2017", image['file_name']))
+        if i % 100 == 0:
+            print("copy {}/{} images".format(i, len(train_images)))
+        
+    for i, image in enumerate(val_images):
+        shutil.copyfile("{}/{}/{}".format(data_dir, val_type, image['file_name']),
+                        "{}/{}/{}".format(data_dir, "val_2017", image['file_name']))
+        if i % 100 == 0:
+            print("copy {}/{} images".format(i, len(val_images)))        
 
 def plot_image(image_json, coco):
     annotation_ids = coco.getAnnIds(imgIds=image_json['id'], catIds=train_people_id, iscrowd=False)
@@ -132,7 +196,10 @@ def preprocess(input_image, input_mask, input_size=128):
     return input_image_, input_mask_
 
 def image_generator(df, coco, data_type, batch_size=16):
-
+    """
+    This is the generator for flowing train or val data 
+    to fit_generator method
+    """
     annotation_dict = df.groupby('image_id')['annotation_id'].apply(list).to_dict()
     image_id_list = np.array(list(annotation_dict.keys()))
     n = len(image_id_list)
@@ -163,6 +230,7 @@ def image_generator(df, coco, data_type, batch_size=16):
 
         yield input_images, input_masks
 
+
 def down_sample(x, filters, size, apply_batch_norm=True):
     x = Conv2D(filters=filters, kernel_size=size, strides=2, padding='same', use_bias=False)(x)
 
@@ -186,8 +254,7 @@ def create_model(output_channel=1):
                     'block_3_expand_relu',   # 32x32
                     'block_6_expand_relu',   # 16x16
                     'block_13_expand_relu',  # 8x8
-                    'block_16_project',      # 4x4
-                ]
+                    'block_16_project']      # 4x4
 
     layers = [base_model.get_layer(name).output for name in layer_names]
     down_stack = Model(inputs=base_model.input, outputs=layers)
@@ -212,4 +279,6 @@ def create_model(output_channel=1):
     return Model(inputs=inputs, outputs=x)
 
 if __name__ == "__main__":
-    train_model()
+    #train_model()
+    copy_training_data()
+
