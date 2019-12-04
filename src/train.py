@@ -184,15 +184,30 @@ def process_mask(coco_object, annotation_ids, width=0, height=0):
     # return in  H*W dimension
     return binary_mask
 
-def preprocess(input_image, input_mask, input_size=128):
+def preprocess(input_image, input_mask, input_size=128, keep_ratio=False):
     """
     Resize image and mask to square of input_size
     Normalize images to [0.0, 1.0)
     """
-    input_image_ = cv2.resize(input_image, (input_size, input_size))
+    if keep_ratio == False:
+        input_image_ = cv2.resize(input_image, (input_size, input_size))
+        input_mask_ = cv2.resize(input_mask, (input_size, input_size))
+    else:
+        input_image_ = np.zeros((input_size, input_size, 3))
+        h, w, _ = input_image.shape
+        ratio = min( 128/h, 128/w)
+        scaled_image = cv2.resize(input_image, None, None, ratio, ratio)
+        
+        new_h, new_w, _ = scaled_image.shape
+        offset_h, offset_w = (h-new_h)//2, (w - new_w)//2
+        input_image_[offset_h: offset_h + new_h, offset_w: offset_w + new_w, :] = scaled_image
+
+
+        input_mask_ = np.zeroes((input_size, input_size))
+        scaled_mask = cv2.resize(input_mask, None, None, ratio, ratio)
+        input_mask_[offset_h: offset_h + new_h, offset_w: offset_w + new_w] = scaled_mask
+
     input_image_ = input_image_/255.0
-    input_mask_ = cv2.resize(input_mask, (input_size, input_size))
-    
     return input_image_, input_mask_
 
 def image_generator(df, coco, data_type, batch_size=16):
