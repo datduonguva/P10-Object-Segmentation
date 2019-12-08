@@ -50,6 +50,12 @@ def train_model(log_dir):
     checkpoint = ModelCheckpoint(log_dir + 'best_model.h5',
         monitor='val_loss', save_weights_only=True, save_best_only=True, period=1)
 
+    early_stopping = EarlyStopping(monitor='val_loss',
+                                   min_delta=0,
+                                   patience=5,
+                                   verbose=0,
+                                   restore_best_weights=True)
+
     model = create_model()
 
     plot_model(model, to_file='model.png', show_shapes=True)
@@ -57,7 +63,7 @@ def train_model(log_dir):
     model.fit_generator(generator=train_generator,
                         steps_per_epoch=np.ceil(len(train_image_ids)/batch_size),
                         epochs=20,
-                        callbacks=[checkpoint, logging],
+                        callbacks=[checkpoint, logging, early_stopping],
                         validation_data=val_generator,
                         validation_steps=np.ceil(len(val_image_ids)/batch_size))
 
@@ -141,7 +147,7 @@ def plot_image(image_json, coco):
     cv2.imshow('image', image)
     cv2.waitKey()
 
-def area_filter(image_ids, coco, threshold=0.1):
+def area_filter(image_ids, coco, threshold=0.03):
     """ 
     This is to filter out object that is too small.
     Return the dataframe containing the image_id and annotation_id
@@ -184,7 +190,7 @@ def process_mask(coco_object, annotation_ids, width=0, height=0):
     # return in  H*W dimension
     return binary_mask
 
-def preprocess(input_image, input_mask, input_size=128, keep_ratio=False):
+def preprocess(input_image, input_mask, input_size=128, keep_ratio=True):
     """
     Resize image and mask to square of input_size
     Normalize images to [0.0, 1.0)

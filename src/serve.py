@@ -66,16 +66,46 @@ def plot_image(image_json, coco):
     cv2.imshow('image', image)
     cv2.waitKey()
 
-def preprocess(input_image, input_mask, input_size=128):
+def preprocess(input_image, input_mask, input_size=128, keep_ratio=True):
     """
     Resize image and mask to square of input_size
     Normalize images to [0.0, 1.0)
     """
-    input_image_ = cv2.resize(input_image, (input_size, input_size))
+    if keep_ratio == False:
+        input_image_ = cv2.resize(input_image, (input_size, input_size))
+        input_mask_ = cv2.resize(input_mask, (input_size, input_size))
+    else:
+        input_image_ = np.zeros((input_size, input_size, 3))
+        h, w, _ = input_image.shape
+        ratio = min(input_size/h, input_size/w)
+        scaled_image = cv2.resize(input_image, None, None, ratio, ratio)
+        
+        new_h, new_w, _ = scaled_image.shape
+        offset_h, offset_w = (input_size-new_h)//2, (input_size - new_w)//2
+        input_image_[offset_h: offset_h + new_h, offset_w: offset_w + new_w, :] = scaled_image
+
+
+        input_mask_ = np.zeros((input_size, input_size))
+        scaled_mask = cv2.resize(input_mask, None, None, ratio, ratio)
+        input_mask_[offset_h: offset_h + new_h, offset_w: offset_w + new_w] = scaled_mask
+
     input_image_ = input_image_/255.0
-    input_mask_ = cv2.resize(input_mask, (input_size, input_size))
-    
     return input_image_, input_mask_
+
+def process_predicted_mask(predicted_mask, input_image, input_size=128, keep_ratio=True):
+    
+    output_ = predicted_mask
+    if keep_ratio:
+        ratio = min(input_size/input_image.shape[0], input_size/input_image.shape[1])
+        new_size = (np.array(input_image.shape)*ratio).astype(int)
+
+        off_set = ((input_size - new_size)/2).astype(int)
+
+        output_ = predicted_mask[off_set[0]: off_set[0] + new_size[0],
+                              off_set[1]: off_set[1] + new_size[1]]
+    
+    output_ = cv2.resize(output_, (input_image.shape[1], input_image.shape[0]))
+    return output_
 
 def down_sample(x, filters, size, apply_batch_norm=True):
     x = Conv2D(filters=filters, kernel_size=size, strides=2, padding='same', use_bias=False)(x)
@@ -126,29 +156,32 @@ def create_model(output_channel=1):
 
 if __name__ == '__main__':
     model = create_model()
-    model.load_weights("/home/datduong/gdrive/projects/P10-Object-Segmentation/logs/001/best_model.h5")
+    model.load_weights("/home/datduong/gdrive/projects/P10-Object-Segmentation/logs/003/best_model.h5")
 
     K.set_learning_phase(0)
 
     while True:
         fn = input("Image path: ")
+        fn = '/home/datduong/github/P8-Gun-Detection/val_images/3c7d9248ed2005a4.jpg'
         image = cv2.imread(fn)
-        input_, _ = preprocess(image, image)
+        input_, _ = preprocess(image, image[:, :, 0])
         output_ = model.predict(np.array([input_]))[0]
         output_ = output_[:, :, 0]
-        output_ = cv2.resize(output_, (image.shape[1], image.shape[0]))
+        cv2.imwrite('mask.jpg', ((output_>0.5).astype(int)*128 + 127))
+        raise SystemExit
+        output_ = process_predicted_mask(output_, image)
 
         width = 600
         height = image.shape[0]/image.shape[1]*width
         height = int(height)
-        #output_ = cv2.resize(output_, (width, height))
-        output_ = (output_ > 0.5)
-        #image = cv2.resize(image, (width, height))
+        output_ = cv2.resize(output_, (width, height))
+        output_ = (output_ > 0.3)
+        image = cv2.resize(image, (width, height))
         blur = cv2.GaussianBlur(image,(25, 25),0)
-        image[np.logical_not(output_)] = 0
+        image[np.logical_not(output_)] = 255
         blur[output_] = 0
-        image = image + blur
+        #image = image + blur
         cv2.imshow('input', image)
-        #cv2.imshow('output', output_)
+        #cv2.imshow('output', output_.astype(float))
         cv2.waitKey()
 
