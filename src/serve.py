@@ -162,13 +162,10 @@ if __name__ == '__main__':
 
     while True:
         fn = input("Image path: ")
-        fn = '/home/datduong/github/P8-Gun-Detection/val_images/3c7d9248ed2005a4.jpg'
         image = cv2.imread(fn)
         input_, _ = preprocess(image, image[:, :, 0])
         output_ = model.predict(np.array([input_]))[0]
         output_ = output_[:, :, 0]
-        cv2.imwrite('mask.jpg', ((output_>0.5).astype(int)*128 + 127))
-        raise SystemExit
         output_ = process_predicted_mask(output_, image)
 
         width = 600
