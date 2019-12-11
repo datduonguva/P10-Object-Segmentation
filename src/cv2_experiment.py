@@ -11,6 +11,7 @@ def find_contours(mask_255):
     ret, image= cv2.threshold(mask_255, 150, 255,0)
     image = image.copy()
 
+    # fill the small holes in the images
     t1 = (image[:-2, :] == 255)
     t2 = (image[1:-1, :] == 0)
     t3 = (image[2:, :] == 255)
@@ -38,8 +39,27 @@ def find_contours(mask_255):
     result = []
     for cnt in contours:
         cnt = contours[0]
-        epsilon = 0.005*cv2.arcLength(cnt,True)
+        epsilon = 0.001*cv2.arcLength(cnt,True)
         approx = cv2.approxPolyDP(cnt,epsilon,True)
-        result.append([(i[0], i[1]) for i in approx[:, 0]])
+        result.append([[i[0], i[1]] for i in approx[:, 0]])
     
     return result
+
+def draw_contours(image, contours):
+
+    # Draw:
+    for cnt in contours:
+        for i in range(len(cnt) - 1):
+            image = cv2.line(image, tuple(cnt[i]), tuple(cnt[i+1]), (0, 255, 0), 3)
+
+    return image
+
+
+
+
+if __name__ == '__main__':
+    image = cv2.imread('mask.jpg', cv2.IMREAD_GRAYSCALE)
+
+    contours = find_contours(image)
+
+    draw_contours(image, contours)

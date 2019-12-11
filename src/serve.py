@@ -8,6 +8,7 @@ from keras.layers import BatchNormalization, LeakyReLU, Conv2D
 from keras.layers import Conv2DTranspose, Input, Concatenate
 from keras.applications import MobileNetV2
 import keras.backend as K
+from cv2_experiment import find_contours, draw_contours
 
 def show_performance(model):
     """ This function is to show some examples from validation data """
@@ -95,17 +96,27 @@ def preprocess(input_image, input_mask, input_size=128, keep_ratio=True):
 def process_predicted_mask(predicted_mask, input_image, input_size=128, keep_ratio=True):
     
     output_ = predicted_mask
-    if keep_ratio:
-        ratio = min(input_size/input_image.shape[0], input_size/input_image.shape[1])
-        new_size = (np.array(input_image.shape)*ratio).astype(int)
+    contours = find_contours(output_*255)
+    ratio = min(input_size/input_image.shape[0], input_size/input_image.shape[1])
+    new_size = (np.array(input_image.shape)*ratio).astype(int)
 
-        off_set = ((input_size - new_size)/2).astype(int)
+    off_set = ((input_size - new_size)/2).astype(int)
 
-        output_ = predicted_mask[off_set[0]: off_set[0] + new_size[0],
-                              off_set[1]: off_set[1] + new_size[1]]
-    
+    output_ = predicted_mask[off_set[0]: off_set[0] + new_size[0],
+                          off_set[1]: off_set[1] + new_size[1]]
+
+    # update contour coordinates
+    for cnt in contours:
+        for point in cnt:
+            point[0] -= off_set[1]
+            point[1] -= off_set[0]
+
+    # resize the mask
     output_ = cv2.resize(output_, (input_image.shape[1], input_image.shape[0]))
-    return output_
+
+    # resize the contours:
+    contours = [[[ int(v/ratio) for v in point] for point in cnt ] for cnt in contours]
+    return output_, contours
 
 def down_sample(x, filters, size, apply_batch_norm=True):
     x = Conv2D(filters=filters, kernel_size=size, strides=2, padding='same', use_bias=False)(x)
@@ -166,19 +177,23 @@ if __name__ == '__main__':
         input_, _ = preprocess(image, image[:, :, 0])
         output_ = model.predict(np.array([input_]))[0]
         output_ = output_[:, :, 0]
-        output_ = process_predicted_mask(output_, image)
+        output_, contours = process_predicted_mask(output_, image)
+        print(contours)
 
+        image = draw_contours(image, contours)
+        
         width = 600
         height = image.shape[0]/image.shape[1]*width
         height = int(height)
         output_ = cv2.resize(output_, (width, height))
         output_ = (output_ > 0.3)
         image = cv2.resize(image, (width, height))
-        blur = cv2.GaussianBlur(image,(25, 25),0)
-        image[np.logical_not(output_)] = 255
-        blur[output_] = 0
+#        blur = cv2.GaussianBlur(image,(25, 25),0)
+#        image[np.logical_not(output_)] = 255
+#        blur[output_] = 0
         #image = image + blur
         cv2.imshow('input', image)
         #cv2.imshow('output', output_.astype(float))
         cv2.waitKey()
+        cv2.destroyAllWindows()
 
