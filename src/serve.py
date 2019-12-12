@@ -108,9 +108,8 @@ def process_predicted_mask(predicted_mask, input_image, input_size=128, keep_rat
     # update contour coordinates
     for cnt in contours:
         for point in cnt:
-            point[0] -= off_set[1]
-            point[1] -= off_set[0]
-
+            point[0] = max(0, point[0] - off_set[1])
+            point[1] = max(0, point[1] - off_set[0])
     # resize the mask
     output_ = cv2.resize(output_, (input_image.shape[1], input_image.shape[0]))
 
@@ -178,20 +177,19 @@ if __name__ == '__main__':
         output_ = model.predict(np.array([input_]))[0]
         output_ = output_[:, :, 0]
         output_, contours = process_predicted_mask(output_, image)
-        print(contours)
 
         image = draw_contours(image, contours)
         
-        width = 600
-        height = image.shape[0]/image.shape[1]*width
-        height = int(height)
-        output_ = cv2.resize(output_, (width, height))
-        output_ = (output_ > 0.3)
-        image = cv2.resize(image, (width, height))
-#        blur = cv2.GaussianBlur(image,(25, 25),0)
-#        image[np.logical_not(output_)] = 255
-#        blur[output_] = 0
-        #image = image + blur
+#        width = 600
+#        height = image.shape[0]/image.shape[1]*width
+#        height = int(height)
+#        output_ = cv2.resize(output_, (width, height))
+#        output_ = (output_ > 0.3)
+#        image = cv2.resize(image, (width, height))
+##        blur = cv2.GaussianBlur(image,(25, 25),0)
+##        image[np.logical_not(output_)] = 255
+##        blur[output_] = 0
+#        #image = image + blur
         cv2.imshow('input', image)
         #cv2.imshow('output', output_.astype(float))
         cv2.waitKey()

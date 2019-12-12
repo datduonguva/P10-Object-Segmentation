@@ -1,14 +1,24 @@
 import cv2
 import numpy as np
 
+def average_contour(cnt):
+#    return cnt
+    result = [cnt[0]]
+    n = len(cnt)
+    for i in range(1, n):
+        px = (cnt[(i-1)%n][0] + 2*cnt[i%n][0] + cnt[(i+1)%n][0])/4
+        py = (cnt[(i-1)%n][1] + 2*cnt[i%n][1] + cnt[(i+1)%n][1])/4
+        result.append([px, py])
 
-def find_contours(mask_255):
+    return result
+
+def find_contours(mask_255, threshold=100):
     """
     This function takes a gray-scale image of range [0, 255],
     return the contours of the white regions
     """
 
-    ret, image= cv2.threshold(mask_255, 150, 255,0)
+    ret, image= cv2.threshold(mask_255, 100, 255,0)
     image = image.copy()
 
     # fill the small holes in the images
@@ -29,7 +39,7 @@ def find_contours(mask_255):
     flooded = cv2.floodFill(image.copy(), None, (0, 0), 255)
     flooded = 255 - flooded[1]
 
-    hole_filled_image = np.logical_or(image> 150, flooded > 150)
+    hole_filled_image = np.logical_or(image> threshold, flooded > threshold)
     hole_filled_image= (hole_filled_image*255.0).astype(np.uint8)
     
     contours,hierarchy = cv2.findContours(hole_filled_image, 1, 2)
@@ -43,14 +53,22 @@ def find_contours(mask_255):
         approx = cv2.approxPolyDP(cnt,epsilon,True)
         result.append([[i[0], i[1]] for i in approx[:, 0]])
     
+    # smooth out the contours:
+    print(result)
+    result = [average_contour(cnt) for cnt in result]
+    print("-------------------------")
+    print(result)
+    print("-------------------------")
+
     return result
 
 def draw_contours(image, contours):
 
     # Draw:
     for cnt in contours:
-        for i in range(len(cnt) - 1):
-            image = cv2.line(image, tuple(cnt[i]), tuple(cnt[i+1]), (0, 255, 0), 3)
+        n = len(cnt)
+        for i in range(n):
+            image = cv2.line(image, tuple(cnt[i%n]), tuple(cnt[(i+1)%n]), (0, 255, 0), 3)
 
     return image
 
