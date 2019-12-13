@@ -67,6 +67,44 @@ def train_model(log_dir):
                         validation_data=val_generator,
                         validation_steps=np.ceil(len(val_image_ids)/batch_size))
 
+def fine_tuning():
+    old_log_dir = '/content/drive/My Drive/projects/P10-Object-Segmentation/logs/003/'
+    model = create_model()
+
+    model.load_weights(os.path.join(old_log_dir, "best_model.h5"))
+
+
+    log_dir = '/content/drive/My Drive/projects/P10-Object-Segmentation/logs/004/'
+    logging = TensorBoard(log_dir=log_dir)
+
+    df_train = area_filter(train_image_ids, train_coco)
+    df_val = area_filter(val_image_ids, val_coco)
+
+    batch_size = 32
+
+    train_generator = image_generator(df_train, train_coco, train_type, batch_size)
+    val_generator = image_generator(df_val, val_coco, val_type, batch_size)
+
+    checkpoint = ModelCheckpoint(log_dir + 'best_model.h5',
+        monitor='val_loss', save_weights_only=True, save_best_only=True, period=1)
+    
+    early_stopping = EarlyStopping(monitor='val_loss', 
+                                   min_delta=0, 
+                                   patience=5, 
+                                   verbose=0,
+                                   restore_best_weights=True)
+    for layer in model.layers:
+        layer.trainable=True
+
+    model.compile(optimizer='adam', loss=custom_loss, metrics=['accuracy'])
+    model.fit_generator(generator=train_generator,
+                        steps_per_epoch=np.ceil(len(train_image_ids)/batch_size),
+                        epochs=20,
+                        callbacks=[checkpoint, logging, early_stopping],
+                        validation_data=val_generator,
+                        validation_steps=np.ceil(len(val_image_ids)/batch_size))
+    return model
+
 def custom_loss(y_true, y_pred):
     return binary_crossentropy(y_true, y_pred)
 

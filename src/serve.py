@@ -180,12 +180,12 @@ if __name__ == '__main__':
 
         image = draw_contours(image, contours)
         
-#        width = 600
-#        height = image.shape[0]/image.shape[1]*width
-#        height = int(height)
+        width = 400
+        height = image.shape[0]/image.shape[1]*width
+        height = int(height)
 #        output_ = cv2.resize(output_, (width, height))
 #        output_ = (output_ > 0.3)
-#        image = cv2.resize(image, (width, height))
+        image = cv2.resize(image, (width, height))
 ##        blur = cv2.GaussianBlur(image,(25, 25),0)
 ##        image[np.logical_not(output_)] = 255
 ##        blur[output_] = 0
