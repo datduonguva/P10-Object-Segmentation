@@ -50,6 +50,12 @@ def train_model(log_dir):
     checkpoint = ModelCheckpoint(log_dir + 'best_model.h5',
         monitor='val_loss', save_weights_only=True, save_best_only=True, period=1)
 
+    early_stopping = EarlyStopping(monitor='val_loss',
+                                   min_delta=0,
+                                   patience=5,
+                                   verbose=0,
+                                   restore_best_weights=True)
+
     model = create_model()
 
     plot_model(model, to_file='model.png', show_shapes=True)
@@ -57,9 +63,47 @@ def train_model(log_dir):
     model.fit_generator(generator=train_generator,
                         steps_per_epoch=np.ceil(len(train_image_ids)/batch_size),
                         epochs=20,
-                        callbacks=[checkpoint, logging],
+                        callbacks=[checkpoint, logging, early_stopping],
                         validation_data=val_generator,
                         validation_steps=np.ceil(len(val_image_ids)/batch_size))
+
+def fine_tuning():
+    old_log_dir = '/content/drive/My Drive/projects/P10-Object-Segmentation/logs/003/'
+    model = create_model()
+
+    model.load_weights(os.path.join(old_log_dir, "best_model.h5"))
+
+
+    log_dir = '/content/drive/My Drive/projects/P10-Object-Segmentation/logs/004/'
+    logging = TensorBoard(log_dir=log_dir)
+
+    df_train = area_filter(train_image_ids, train_coco)
+    df_val = area_filter(val_image_ids, val_coco)
+
+    batch_size = 32
+
+    train_generator = image_generator(df_train, train_coco, train_type, batch_size)
+    val_generator = image_generator(df_val, val_coco, val_type, batch_size)
+
+    checkpoint = ModelCheckpoint(log_dir + 'best_model.h5',
+        monitor='val_loss', save_weights_only=True, save_best_only=True, period=1)
+    
+    early_stopping = EarlyStopping(monitor='val_loss', 
+                                   min_delta=0, 
+                                   patience=5, 
+                                   verbose=0,
+                                   restore_best_weights=True)
+    for layer in model.layers:
+        layer.trainable=True
+
+    model.compile(optimizer='adam', loss=custom_loss, metrics=['accuracy'])
+    model.fit_generator(generator=train_generator,
+                        steps_per_epoch=np.ceil(len(train_image_ids)/batch_size),
+                        epochs=20,
+                        callbacks=[checkpoint, logging, early_stopping],
+                        validation_data=val_generator,
+                        validation_steps=np.ceil(len(val_image_ids)/batch_size))
+    return model
 
 def custom_loss(y_true, y_pred):
     return binary_crossentropy(y_true, y_pred)
@@ -141,7 +185,7 @@ def plot_image(image_json, coco):
     cv2.imshow('image', image)
     cv2.waitKey()
 
-def area_filter(image_ids, coco, threshold=0.1):
+def area_filter(image_ids, coco, threshold=0.03):
     """ 
     This is to filter out object that is too small.
     Return the dataframe containing the image_id and annotation_id
@@ -184,15 +228,30 @@ def process_mask(coco_object, annotation_ids, width=0, height=0):
     # return in  H*W dimension
     return binary_mask
 
-def preprocess(input_image, input_mask, input_size=128):
+def preprocess(input_image, input_mask, input_size=128, keep_ratio=True):
     """
     Resize image and mask to square of input_size
     Normalize images to [0.0, 1.0)
     """
-    input_image_ = cv2.resize(input_image, (input_size, input_size))
+    if keep_ratio == False:
+        input_image_ = cv2.resize(input_image, (input_size, input_size))
+        input_mask_ = cv2.resize(input_mask, (input_size, input_size))
+    else:
+        input_image_ = np.zeros((input_size, input_size, 3))
+        h, w, _ = input_image.shape
+        ratio = min( 128/h, 128/w)
+        scaled_image = cv2.resize(input_image, None, None, ratio, ratio)
+        
+        new_h, new_w, _ = scaled_image.shape
+        offset_h, offset_w = (h-new_h)//2, (w - new_w)//2
+        input_image_[offset_h: offset_h + new_h, offset_w: offset_w + new_w, :] = scaled_image
+
+
+        input_mask_ = np.zeroes((input_size, input_size))
+        scaled_mask = cv2.resize(input_mask, None, None, ratio, ratio)
+        input_mask_[offset_h: offset_h + new_h, offset_w: offset_w + new_w] = scaled_mask
+
     input_image_ = input_image_/255.0
-    input_mask_ = cv2.resize(input_mask, (input_size, input_size))
-    
     return input_image_, input_mask_
 
 def image_generator(df, coco, data_type, batch_size=16):
