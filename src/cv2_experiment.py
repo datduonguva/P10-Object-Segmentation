@@ -71,7 +71,7 @@ def draw_contours(image, contours):
     for cnt in contours:
         n = len(cnt)
         for i in range(n):
-            image = cv2.line(image, tuple(cnt[i%n]), tuple(cnt[(i+1)%n]), (0, 255, 0), 3)
+            image = cv2.line(image, tuple(cnt[i%n]), tuple(cnt[(i+1)%n]), (0, 255, 0), 5)
 
     return image
 
