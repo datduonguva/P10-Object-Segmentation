@@ -14,24 +14,6 @@ from keras.applications import MobileNetV2
 from keras.callbacks import TensorBoard, ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
 from keras.losses import binary_crossentropy
 from keras.utils import plot_model 
-data_dir = '../data'
-val_type = 'val2017'
-train_type = 'train2017'
-
-train_annotation_file = '{}/annotations/instances_{}.json'.format(data_dir, train_type)
-val_annotation_file = '{}/annotations/instances_{}.json'.format(data_dir, val_type)
-
-train_coco = COCO(train_annotation_file)
-val_coco = COCO(val_annotation_file)
-
-# only select images with name "person"
-train_people_id = train_coco.getCatIds(catNms=['person'])
-val_people_id = val_coco.getCatIds(catNms=['person'])
-
-train_image_ids = train_coco.getImgIds(catIds=train_people_id)
-val_image_ids = val_coco.getImgIds(catIds=val_people_id)
-
-log_dir = '/content/drive/My Drive/projects/P10-Object-Segmentation/logs/001/'
 
 def train_model(log_dir):
     """
@@ -339,5 +321,24 @@ def create_model(output_channel=1):
 
 if __name__ == "__main__":
     #train_model()
+    data_dir = '../data'
+    val_type = 'val2017'
+    train_type = 'train2017'
+
+    train_annotation_file = '{}/annotations/instances_{}.json'.format(data_dir, train_type)
+    val_annotation_file = '{}/annotations/instances_{}.json'.format(data_dir, val_type)
+
+    train_coco = COCO(train_annotation_file)
+    val_coco = COCO(val_annotation_file)
+
+# only select images with name "person"
+    train_people_id = train_coco.getCatIds(catNms=['person'])
+    val_people_id = val_coco.getCatIds(catNms=['person'])
+
+    train_image_ids = train_coco.getImgIds(catIds=train_people_id)
+    val_image_ids = val_coco.getImgIds(catIds=val_people_id)
+
+    log_dir = '/content/drive/My Drive/projects/P10-Object-Segmentation/logs/001/'
+
     copy_training_data()
 

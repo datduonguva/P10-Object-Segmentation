@@ -8,7 +8,7 @@ from keras.layers import BatchNormalization, LeakyReLU, Conv2D
 from keras.layers import Conv2DTranspose, Input, Concatenate
 from keras.applications import MobileNetV2
 import keras.backend as K
-from cv2_experiment import find_contours, draw_contours
+from mask_to_contours import find_contours, draw_contours
 
 def show_performance(model):
     """ This function is to show some examples from validation data """
@@ -96,7 +96,7 @@ def preprocess(input_image, input_mask, input_size=128, keep_ratio=True):
 def process_predicted_mask(predicted_mask, input_image, input_size=128, keep_ratio=True):
     
     output_ = predicted_mask
-    contours = find_contours(output_*255)
+    contours = find_contours((output_*255).astype(np.uint8))
     ratio = min(input_size/input_image.shape[0], input_size/input_image.shape[1])
     new_size = (np.array(input_image.shape)*ratio).astype(int)
 
@@ -166,7 +166,7 @@ def create_model(output_channel=1):
 
 if __name__ == '__main__':
     model = create_model()
-    model.load_weights("/home/datduong/gdrive/projects/P10-Object-Segmentation/logs/003/best_model.h5")
+    model.load_weights("/home/datduong/gdrive/projects/P10-Object-Segmentation/logs/004/best_model.h5")
 
     K.set_learning_phase(0)
 
@@ -180,18 +180,11 @@ if __name__ == '__main__':
 
         image = draw_contours(image, contours)
         
-        width = 400
+        width = 500
         height = image.shape[0]/image.shape[1]*width
         height = int(height)
-#        output_ = cv2.resize(output_, (width, height))
-#        output_ = (output_ > 0.3)
         image = cv2.resize(image, (width, height))
-##        blur = cv2.GaussianBlur(image,(25, 25),0)
-##        image[np.logical_not(output_)] = 255
-##        blur[output_] = 0
-#        #image = image + blur
         cv2.imshow('input', image)
-        #cv2.imshow('output', output_.astype(float))
         cv2.waitKey()
         cv2.destroyAllWindows()
 
