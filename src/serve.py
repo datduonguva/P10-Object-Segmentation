@@ -8,7 +8,7 @@ from keras.layers import BatchNormalization, LeakyReLU, Conv2D
 from keras.layers import Conv2DTranspose, Input, Concatenate
 from keras.applications import MobileNetV2
 import keras.backend as K
-from cv2_experiment import find_contours, draw_contours
+from mask_to_contours import find_contours, draw_contours
 
 def show_performance(model):
     """ This function is to show some examples from validation data """
