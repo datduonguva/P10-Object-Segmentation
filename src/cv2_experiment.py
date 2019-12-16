@@ -3,7 +3,9 @@ import sys
 import numpy as np
 
 def average_contour(cnt):
-#    return cnt
+    """
+    This function smooths out the contours created by the model
+    """
     result = [cnt[0]]
     n = len(cnt)
     for i in range(1, n):
@@ -20,32 +22,7 @@ def find_contours(mask_255, threshold=100):
     """
 
     ret, image= cv2.threshold(mask_255, threshold, 255,0)
-#    image = image.copy()
-#
-#    # fill the small holes in the images
-#    t1 = (image[:-2, :] == 255)
-#    t2 = (image[1:-1, :] == 0)
-#    t3 = (image[2:, :] == 255)
-#    t4 = np.logical_and(t1 == t2, t1 == t3) + 0
-#    t5 = np.pad(t4, ((1, 1), (0, 0)), 'constant', constant_values=0)
-#    image[t5 == 1] = 255
-#    
-#    t1 = (image[:, :-2] == 255)
-#    t2 = (image[:, 1:-1] == 0)
-#    t3 = (image[:, 2:] == 255)
-#    t4 = np.logical_and(t1 == t2, t1 == t3) + 0
-#    t5 = np.pad(t4, ((0, 0), (1, 1)), 'constant', constant_values=0)
-#    image[t5 == 1] = 255
-#
-#    flooded = cv2.floodFill(image.copy(), None, (0, 0), 255)
-#    flooded = 255 - flooded[1]
-#
-#   
-#    hole_filled_image = np.logical_or(image> threshold, flooded > threshold)
-#    hole_filled_image= (hole_filled_image*255.0).astype(np.uint8)
-#
-
-    
+   
     contours,hierarchy = cv2.findContours(image, 1, 2)
     contours = sorted(contours, key=lambda x: len(x), reverse=True)
     contours = [i for i in contours if len(i) > 20]
@@ -59,14 +36,13 @@ def find_contours(mask_255, threshold=100):
     
     # smooth out the contours:
     result = [average_contour(cnt) for cnt in result]
-    print("-------------------------")
-    print(result)
-    print("-------------------------")
-
     return result
 
 def draw_contours(image, contours):
-
+    """
+    This function draw the contours
+    on the given image
+    """
     # Draw:
     for cnt in contours:
         n = len(cnt)
@@ -75,10 +51,10 @@ def draw_contours(image, contours):
 
     return image
 
-
-
-
 if __name__ == '__main__':
+    """
+    Test to see if it works as expected
+    """
     image = cv2.imread('/home/datduong/Desktop/mask.png', cv2.IMREAD_GRAYSCALE)
 
     contours = find_contours(image, int(sys.argv[1]))
